@@ -1,8 +1,12 @@
 package ru.edu.qamid.tests;
 
+import static androidx.test.espresso.Espresso.onIdle;
+
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -28,30 +32,39 @@ public class QuotesTests {
     private Steps steps = new Steps();
     private AuthPage authPage = new AuthPage();
     private QuotesPage quotesPage = new QuotesPage();
+    private ActivityScenario<AppActivity> scenario;
 
     @Before
     public void setUp() {
-        try {
-            Thread.sleep(20000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        steps.loginIfNeeded("login2", "password2");
-        try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        scenario = ActivityScenario.launch(AppActivity.class);
+        scenario.onActivity(activity -> {});
+        onIdle();
+        authPage.waitForAnyScreen();
+        authPage.logoutIfNeeded();
+        authPage.waitForLoad();
+        // Логинимся
+        steps.loginWithValidData();
+    }
+
+    @After
+    public void tearDown() {
+        if (scenario != null) {
+            scenario.close();
         }
     }
 
     @Test
     @Story("Просмотр раздела Цитаты")
     public void testQuotesDisplay() {
+        quotesPage.openQuotes();
         quotesPage.checkQuotesListIsDisplayed();
     }
+
     @Test
-    @Story("Проверка текста цитат")
-    public void testQuotesTextIsDisplayed() {
+    @Story("Текст цитаты отображается")
+    public void testQuoteTextIsDisplayed() {
+        quotesPage.openQuotes();
         quotesPage.checkQuotesListIsDisplayed();
+        quotesPage.checkAtLeastOneQuoteIsDisplayed();
     }
 }

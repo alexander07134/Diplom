@@ -1,10 +1,12 @@
 package ru.edu.qamid.tests;
 
-import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import static androidx.test.espresso.Espresso.onIdle;
+
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -14,101 +16,120 @@ import io.qameta.allure.kotlin.Story;
 import ru.edu.qamid.pages.AuthPage;
 import ru.edu.qamid.steps.Steps;
 import ru.edu.qamid.ui.AppActivity;
+import ru.edu.qamid.utils.TestData;
 
 @RunWith(AndroidJUnit4.class)
 @Epic("Тестирование мобильного приложения Хоспис")
 @Feature("Авторизация")
 public class AuthTests {
 
-    @Rule
-    public ActivityScenarioRule<AppActivity> rule =
-            new ActivityScenarioRule<>(AppActivity.class);
-
+    private ActivityScenario<AppActivity> scenario;
     private Steps steps = new Steps();
     private AuthPage authPage = new AuthPage();
 
     @Before
     public void setUp() {
-        try {
-            Thread.sleep(20000); // Ждём загрузки приложения
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        scenario = ActivityScenario.launch(AppActivity.class);
+        scenario.onActivity(activity -> {
+
+        });
+        onIdle();
+        authPage.waitForAnyScreen();
+        authPage.logoutIfNeeded();
+        authPage.waitForLoad();
+    }
+
+    @After
+    public void tearDown() {
+        if (scenario != null) {
+            scenario.close();
         }
     }
 
+
+
     @Test
-    @Story("Позитивный сценарий авторизации")
+    @Story("Позитивный сценарий: вход с валидными данными")
     public void testValidLogin() {
-        steps.login("login2", "password2");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithValidData();
+        authPage.checkMainScreenIsDisplayed();
     }
 
     @Test
     @Story("Негативный сценарий: невалидный логин")
     public void testInvalidLogin() {
-        steps.login("invalid", "password2");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithInvalidData(TestData.INVALID_LOGIN, TestData.VALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_INVALID_CREDENTIALS);
     }
 
     @Test
     @Story("Негативный сценарий: невалидный пароль")
     public void testInvalidPassword() {
-        steps.login("login2", "wrong");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithInvalidData(TestData.VALID_LOGIN, TestData.INVALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_INVALID_CREDENTIALS);
     }
 
     @Test
     @Story("Негативный сценарий: пустые поля")
     public void testEmptyFields() {
-        authPage.clickEnterButton();
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithEmptyFields();
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_EMPTY_FIELDS);
     }
+
+
+
     @Test
     @Story("Негативный сценарий: пустой логин")
     public void testEmptyLogin() {
-        steps.login("", "password2");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithEmptyLogin(TestData.VALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_EMPTY_FIELDS);
     }
 
     @Test
     @Story("Негативный сценарий: пустой пароль")
     public void testEmptyPassword() {
-        steps.login("login2", "");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithEmptyPassword(TestData.VALID_LOGIN);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_EMPTY_FIELDS);
     }
 
     @Test
-    @Story("Негативный сценарий: логин с пробелами в начале")
-    public void testLoginWithLeadingSpaces() {
-        steps.login(" login2", "password2");
-        authPage.checkErrorIconIsDisplayed();
+    @Story("Позитивный сценарий: пробел в начале логина игнорируется")
+    public void testLoginWithLeadingSpace() {
+        steps.loginWithWhitespaceLogin(TestData.LOGIN_WITH_LEADING_SPACE);
+        authPage.checkMainScreenIsDisplayed();
     }
 
     @Test
-    @Story("Негативный сценарий: логин с пробелами в конце")
-    public void testLoginWithTrailingSpaces() {
-        steps.login("login2 ", "password2");
-        authPage.checkErrorIconIsDisplayed();
+    @Story("Позитивный сценарий: пробел в конце логина игнорируется")
+    public void testLoginWithTrailingSpace() {
+        steps.loginWithWhitespaceLogin(TestData.LOGIN_WITH_TRAILING_SPACE);
+        authPage.checkMainScreenIsDisplayed();
     }
 
     @Test
     @Story("Негативный сценарий: логин в верхнем регистре")
-    public void testLoginUpperCase() {
-        steps.login("LOGIN2", "password2");
-        authPage.checkErrorIconIsDisplayed();
+    public void testLoginUppercase() {
+        steps.loginWithInvalidData(TestData.LOGIN_UPPERCASE, TestData.VALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_INVALID_CREDENTIALS);
     }
 
     @Test
     @Story("Негативный сценарий: логин в смешанном регистре")
     public void testLoginMixedCase() {
-        steps.login("LoGiN2", "password2");
-        authPage.checkErrorIconIsDisplayed();
+        steps.loginWithInvalidData(TestData.LOGIN_MIXED_CASE, TestData.VALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_INVALID_CREDENTIALS);
     }
 
     @Test
     @Story("Негативный сценарий: спецсимволы в логине")
-    public void testLoginWithSpecialChars() {
-        steps.login("!@#$%^&*()", "password2");
-        authPage.checkErrorIconIsDisplayed();
+    public void testLoginSpecialChars() {
+        steps.loginWithInvalidData(TestData.LOGIN_SPECIAL_CHARS, TestData.VALID_PASSWORD);
+        authPage.checkErrorMessageIsDisplayed(TestData.ERROR_INVALID_CREDENTIALS);
+    }
+
+    @Test
+    @Story("Позитивный сценарий: маскировка пароля")
+    public void testPasswordIsMasked() {
+        steps.checkPasswordMasking();
     }
 }

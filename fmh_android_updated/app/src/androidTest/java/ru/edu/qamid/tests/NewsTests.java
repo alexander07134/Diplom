@@ -1,10 +1,12 @@
 package ru.edu.qamid.tests;
 
-import androidx.test.ext.junit.rules.ActivityScenarioRule;
+import static androidx.test.espresso.Espresso.onIdle;
+
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -15,32 +17,33 @@ import ru.edu.qamid.pages.AuthPage;
 import ru.edu.qamid.pages.NewsPage;
 import ru.edu.qamid.steps.Steps;
 import ru.edu.qamid.ui.AppActivity;
+import ru.edu.qamid.utils.TestData;
 
 @RunWith(AndroidJUnit4.class)
 @Epic("Тестирование мобильного приложения Хоспис")
 @Feature("Новости")
 public class NewsTests {
 
-    @Rule
-    public ActivityScenarioRule<AppActivity> rule =
-            new ActivityScenarioRule<>(AppActivity.class);
-
+    private ActivityScenario<AppActivity> scenario;
     private Steps steps = new Steps();
     private AuthPage authPage = new AuthPage();
     private NewsPage newsPage = new NewsPage();
 
     @Before
     public void setUp() {
-        try {
-            Thread.sleep(20000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        steps.loginIfNeeded("login2", "password2");
-        try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        scenario = ActivityScenario.launch(AppActivity.class);
+        scenario.onActivity(activity -> {});
+        onIdle();
+        authPage.waitForAnyScreen();
+        authPage.logoutIfNeeded();
+        authPage.waitForLoad();
+        steps.loginWithValidData();
+    }
+
+    @After
+    public void tearDown() {
+        if (scenario != null) {
+            scenario.close();
         }
     }
 
@@ -54,12 +57,64 @@ public class NewsTests {
     @Test
     @Story("Создание новости")
     public void testCreateNews() {
-        String title = "Test news " + System.currentTimeMillis();
-        String description = "Test description";
-        String date = "27.09.2026";
+        String title = TestData.NEWS_TITLE + System.currentTimeMillis();
+        steps.createNews(title, TestData.NEWS_DESCRIPTION, TestData.getTodayDate());
 
-        steps.createNews(title, description, date);
+        newsPage.waitForControlPanel();
+        onIdle();
         newsPage.checkNewsInList(title);
+    }
+
+    @Test
+    @Story("Редактирование новости")
+    public void testEditNews() {
+        String oldTitle = TestData.NEWS_TITLE + System.currentTimeMillis();
+        steps.createNews(oldTitle, TestData.NEWS_DESCRIPTION, TestData.getTodayDate());
+
+        newsPage.waitForNewsList();
+        newsPage.checkNewsInList(oldTitle);
+
+        String newTitle = oldTitle + "_edited";
+        steps.editNews(oldTitle, newTitle);
+
+        newsPage.waitForNewsList();
+        onIdle();
+        newsPage.checkNewsInList(newTitle);
+        newsPage.checkNewsNotInList(oldTitle);
+    }
+
+    @Test
+    @Story("Редактирование описания новости")
+    public void testEditNewsDescription() {
+        String title = TestData.NEWS_TITLE + "desc_" + System.currentTimeMillis();
+        steps.createNews(title, TestData.NEWS_DESCRIPTION, TestData.getTodayDate());
+
+        newsPage.waitForNewsList();
+        onIdle();
+        newsPage.checkNewsInList(title);
+
+        String newDescription = TestData.NEWS_DESCRIPTION_EDITED + " " + System.currentTimeMillis();
+        steps.editNewsDescription(title, newDescription);
+
+        newsPage.waitForNewsList();
+        onIdle();
+        newsPage.checkNewsInList(title);
+        newsPage.checkDescriptionInList(title, newDescription);
+    }
+
+    @Test
+    @Story("Удаление новости")
+    public void testDeleteNews() {
+        String title = TestData.NEWS_TITLE + System.currentTimeMillis();
+        steps.createNews(title, TestData.NEWS_DESCRIPTION, TestData.getTodayDate());
+
+        newsPage.waitForNewsList();
+        onIdle();
+        newsPage.checkNewsInList(title);
+
+        steps.deleteNews(title);
+        onIdle();
+        newsPage.checkNewsNotInList(title);
     }
     @Test
     @Story("Негативный сценарий: создание новости с пустыми полями")
@@ -68,47 +123,31 @@ public class NewsTests {
         newsPage.clickEditButton();
         newsPage.clickAddNews();
         newsPage.clickSave();
-        newsPage.checkCreatingScreenIsDisplayed();
+        newsPage.checkErrorMessageIsDisplayed(TestData.ERROR_EMPTY_NEWS_FIELDS);
     }
 
     @Test
-    @Story("Негативный сценарий: создание новости без заголовка")
+    @Story("Негативный сценарий: создание без заголовка")
     public void testCreateNewsWithoutTitle() {
-        newsPage.clickAllNews();
-        newsPage.clickEditButton();
-        newsPage.clickAddNews();
-        newsPage.enterDescription("Описание без заголовка");
-        newsPage.clickSave();
-        newsPage.checkCreatingScreenIsDisplayed();
+        String description = TestData.NEWS_DESCRIPTION + System.currentTimeMillis();
+        steps.createNewsWithoutTitle(description, TestData.getTodayDate());
     }
 
     @Test
-    @Story("Негативный сценарий: создание новости без описания")
+    @Story("Негативный сценарий: создание без описания")
     public void testCreateNewsWithoutDescription() {
-        newsPage.clickAllNews();
-        newsPage.clickEditButton();
-        newsPage.clickAddNews();
-        newsPage.enterTitle("Заголовок без описания");
-        newsPage.clickSave();
-        newsPage.checkCreatingScreenIsDisplayed();
+        String title = TestData.NEWS_TITLE + "no_desc_" + System.currentTimeMillis();
+        steps.createNewsWithoutDescription(title, TestData.getTodayDate());
     }
 
     @Test
-    @Story("Редактирование новости")
-    public void testEditNews() {
-        // Открыть список новостей
-        newsPage.clickAllNews();
-        // Нажать редактирование
-        newsPage.clickEditButton();
-        // Проверить, что список новостей виден
-        newsPage.checkNewsListIsDisplayed();
-    }
+    @Story("Известный баг: создание новости с датой в будущем")
+    public void testCreateNewsWithFutureDate() {
+        String title = TestData.NEWS_TITLE + "future_" + System.currentTimeMillis();
+        steps.createNewsWithFutureDate(title, TestData.NEWS_DESCRIPTION);
 
-    @Test
-    @Story("Удаление новости")
-    public void testDeleteNews() {
-        newsPage.clickAllNews();
-        newsPage.clickEditButton();
-        newsPage.checkNewsListIsDisplayed();
+        newsPage.waitForControlPanel();
+        onIdle();
+        newsPage.checkNewsInList(title);
     }
 }
